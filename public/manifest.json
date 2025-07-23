@@ -1,0 +1,37 @@
+{
+  "name": "Time Manager - Gestão de Futebol",
+  "short_name": "Time Manager",
+  "description": "Sistema completo de gestão para times de futebol com funcionalidades para administradores e jogadores.",
+  "start_url": "/",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "window-controls-overlay", "standalone"],
+  "background_color": "#F8FAFC",
+  "theme_color": "#1E293B",
+  "orientation": "portrait-primary",
+  "lang": "pt-BR",
+  "scope": "/",
+  "categories": ["sports", "productivity", "business"],
+  "icons": [
+    {
+      "src": "icone.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "description": "Acesso rápido ao dashboard principal",
+      "url": "/"
+    },
+    {
+      "name": "Próximos Jogos",
+      "short_name": "Jogos",
+      "description": "Ver próximos jogos agendados",
+      "url": "/?tab=jogos"
+    }
+  ],
+  "screenshots": [],
+  "prefer_related_applications": false
+}
