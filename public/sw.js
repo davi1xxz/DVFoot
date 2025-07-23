@@ -28,9 +28,8 @@ const dynamicUrls = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => {
-        return cache.addAll(urlsToCache);
-      })
+      .then((cache) => cache.addAll(urlsToCache))
+      .then(() => self.skipWaiting())
   );
 });
 
@@ -179,30 +178,28 @@ async function syncData() {
 // Registrar periodic sync
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    self.registration.periodicSync.register('background-sync', {
-      minInterval: 24 * 60 * 60 * 1000, // 24 horas
-    }).catch(err => console.log('Periodic sync não suportado:', err))
-  );
-});
-
-// Atualização periódica
-self.addEventListener('periodicsync', (event) => {
-  if (event.tag === 'background-sync') {
-    event.waitUntil(syncData());
-  }
-});
-
-// Limpeza de cache antigo
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then(cacheNames => {
-      return Promise.all(
+    (async () => {
+      // Limpeza de caches antigos
+      const cacheNames = await caches.keys();
+      await Promise.all(
         cacheNames.map(cacheName => {
           if (cacheName !== CACHE_NAME && cacheName !== STATIC_CACHE && cacheName !== DYNAMIC_CACHE) {
             return caches.delete(cacheName);
           }
         })
       );
-    })
+      // Claim clients para controle imediato
+      await self.clients.claim();
+      // Registrar periodicSync apenas se suportado
+      if ('periodicSync' in self.registration) {
+        try {
+          await self.registration.periodicSync.register('background-sync', {
+            minInterval: 24 * 60 * 60 * 1000, // 24 horas
+          });
+        } catch (err) {
+          console.log('Periodic sync não suportado:', err);
+        }
+      }
+    })()
   );
 });
