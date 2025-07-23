@@ -1,5 +1,5 @@
 // Componente principal da aplicação que gerencia o fluxo de autenticação
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import Login from '../components/Login';
 import SelecaoPerfil from '../components/SelecaoPerfil';
@@ -12,6 +12,28 @@ import LoadingSpinner from '../components/ui/loading-spinner';
 const MainApp: React.FC = () => {
   const { usuario, perfilSelecionado, isLoading } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
+
+  useEffect(() => {
+    // Função para registrar o Background Sync
+    const registerSync = async () => {
+      if ('serviceWorker' in navigator && 'SyncManager' in window) {
+        try {
+          const registration = await navigator.serviceWorker.ready;
+          await registration.sync.register('sync-data');
+          console.log('Background Sync registrado com sucesso para "sync-data"');
+        } catch (err) {
+          console.error('Falha ao registrar Background Sync:', err);
+        }
+      } else {
+        console.log('Background Sync não é suportado neste navegador.');
+      }
+    };
+
+    // Só registra o sync se tiver um usuário logado
+    if (usuario) {
+      registerSync();
+    }
+  }, [usuario]); // Executa quando o estado do usuário muda
 
   // Loading state
   if (isLoading) {
