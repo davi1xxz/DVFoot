@@ -26,77 +26,65 @@ const dynamicUrls = [
 
 // Instalação do Service Worker
 self.addEventListener('install', (event) => {
+  console.log('Service Worker: Instalando...');
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(urlsToCache))
-      .then(() => self.skipWaiting())
+    Promise.race([
+      // Promise principal com timeout
+      caches.open(CACHE_NAME)
+        .then((cache) => {
+          console.log('Service Worker: Cache aberto, adicionando URLs...');
+          return cache.addAll(urlsToCache.filter(url => url !== '/offline.html')); // Remover URLs problemáticas
+        })
+        .then(() => {
+          console.log('Service Worker: URLs adicionadas ao cache');
+          return self.skipWaiting();
+        }),
+      // Timeout de 15 segundos
+      new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Timeout na instalação do Service Worker')), 15000);
+      })
+    ]).catch(error => {
+      console.error('Service Worker: Erro na instalação:', error);
+      // Continuar mesmo com erro para não bloquear
+      return self.skipWaiting();
+    })
   );
 });
 
-// Interceptar requisições com estratégia avançada
+// Estratégia de Fetch: Stale-While-Revalidate com Timeouts
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Estratégia Cache First para recursos estáticos
-  if (urlsToCache.some(cachedUrl => request.url.includes(cachedUrl))) {
-    event.respondWith(
-      caches.match(request)
-        .then(response => response || fetch(request))
-        .catch(() => caches.match('/offline.html'))
-    );
+  // Ignorar requisições que não são GET
+  if (request.method !== 'GET') {
     return;
   }
 
-  // Estratégia Network First para APIs
-  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/data/')) {
-    event.respondWith(
-      fetch(request)
-        .then(response => {
-          // Clone e cache a resposta
-          const responseClone = response.clone();
-          caches.open(DYNAMIC_CACHE)
-            .then(cache => cache.put(request, responseClone));
-          return response;
-        })
-        .catch(() => {
-          // Fallback para cache se network falhar
-          return caches.match(request)
-            .then(response => response || new Response(
-              JSON.stringify({ error: 'Offline', cached: true }),
-              { headers: { 'Content-Type': 'application/json' } }
-            ));
-        })
-    );
+  // Ignorar requisições do Chrome Extension
+  if (url.protocol === 'chrome-extension:') {
     return;
   }
 
-  // Estratégia padrão: Cache First com Network Fallback
+  // Estratégia Stale-While-Revalidate
   event.respondWith(
-    caches.match(request)
-      .then(response => {
-        if (response) {
-          return response;
-        }
-        
-        return fetch(request)
-          .then(fetchResponse => {
-            // Cache recursos dinâmicos
-            if (fetchResponse.status === 200) {
-              const responseClone = fetchResponse.clone();
-              caches.open(DYNAMIC_CACHE)
-                .then(cache => cache.put(request, responseClone));
-            }
-            return fetchResponse;
-          })
-          .catch(() => {
-            // Fallback para página offline
-            if (request.destination === 'document') {
-              return caches.match('/offline.html');
-            }
-            return new Response('Offline', { status: 503 });
-          });
-      })
+    caches.open(DYNAMIC_CACHE).then(cache => {
+      return cache.match(request).then(cachedResponse => {
+        const fetchPromise = fetch(request).then(networkResponse => {
+          // Se a resposta da rede for válida, atualiza o cache
+          if (networkResponse.ok) {
+            cache.put(request, networkResponse.clone());
+          }
+          return networkResponse;
+        });
+
+        // Retorna a resposta do cache imediatamente se existir, senão aguarda a rede
+        return cachedResponse || fetchPromise;
+      }).catch(() => {
+        // Fallback em caso de erro total
+        return caches.match('/offline.html');
+      });
+    })
   );
 });
 
@@ -175,31 +163,54 @@ async function syncData() {
   }
 }
 
-// Registrar periodic sync
+// Ativação do Service Worker
 self.addEventListener('activate', (event) => {
+  console.log('Service Worker: Ativando...');
   event.waitUntil(
-    (async () => {
-      // Limpeza de caches antigos
-      const cacheNames = await caches.keys();
-      await Promise.all(
-        cacheNames.map(cacheName => {
-          if (cacheName !== CACHE_NAME && cacheName !== STATIC_CACHE && cacheName !== DYNAMIC_CACHE) {
-            return caches.delete(cacheName);
-          }
-        })
-      );
-      // Claim clients para controle imediato
-      await self.clients.claim();
-      // Registrar periodicSync apenas se suportado
-      if ('periodicSync' in self.registration) {
+    Promise.race([
+      (async () => {
         try {
-          await self.registration.periodicSync.register('background-sync', {
-            minInterval: 24 * 60 * 60 * 1000, // 24 horas
-          });
-        } catch (err) {
-          console.log('Periodic sync não suportado:', err);
+          console.log('Service Worker: Limpando caches antigos...');
+          // Limpeza de caches antigos
+          const cacheNames = await caches.keys();
+          await Promise.all(
+            cacheNames.map(cacheName => {
+              if (cacheName !== CACHE_NAME && cacheName !== STATIC_CACHE && cacheName !== DYNAMIC_CACHE) {
+                console.log(`Service Worker: Removendo cache antigo: ${cacheName}`);
+                return caches.delete(cacheName);
+              }
+            })
+          );
+          
+          console.log('Service Worker: Assumindo controle dos clientes...');
+          // Claim clients para controle imediato
+          await self.clients.claim();
+          
+          // Registrar periodicSync apenas se suportado (sem bloquear)
+          if ('periodicSync' in self.registration) {
+            try {
+              await self.registration.periodicSync.register('background-sync', {
+                minInterval: 24 * 60 * 60 * 1000, // 24 horas
+              });
+              console.log('Service Worker: Periodic sync registrado');
+            } catch (err) {
+              console.log('Service Worker: Periodic sync não suportado:', err);
+            }
+          }
+          
+          console.log('Service Worker: Ativação concluída com sucesso');
+        } catch (error) {
+          console.error('Service Worker: Erro na ativação:', error);
+          // Continuar mesmo com erro
         }
-      }
-    })()
+      })(),
+      // Timeout de 10 segundos para ativação
+      new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Timeout na ativação do Service Worker')), 10000);
+      })
+    ]).catch(error => {
+      console.error('Service Worker: Erro ou timeout na ativação:', error);
+      // Não falhar completamente, apenas log o erro
+    })
   );
 });

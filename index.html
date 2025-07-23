@@ -44,17 +44,72 @@
     <!-- Service Worker Registration -->
     <script>
       if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
-      .then((registration) => {
-        console.log('Service Worker registrado com sucesso:', registration);
-      })
-      .catch((error) => {
-        console.error('Erro ao registrar Service Worker:', error);
-        alert('Erro ao registrar Service Worker: ' + error.message);
-      });
-  });
-}
+        // Função para registrar service worker com timeout e retry
+        async function registerServiceWorker() {
+          const maxRetries = 3;
+          const timeout = 10000; // 10 segundos
+          
+          for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+              console.log(`Tentativa ${attempt} de registrar Service Worker...`);
+              
+              // Promise com timeout
+              const registrationPromise = navigator.serviceWorker.register('/sw.js', {
+                scope: '/',
+                updateViaCache: 'none'
+              });
+              
+              const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Timeout na registração do Service Worker')), timeout);
+              });
+              
+              const registration = await Promise.race([registrationPromise, timeoutPromise]);
+              
+              console.log('Service Worker registrado com sucesso:', registration);
+              
+              // Verificar se há atualizações
+              registration.addEventListener('updatefound', () => {
+                console.log('Nova versão do Service Worker encontrada');
+                const newWorker = registration.installing;
+                newWorker.addEventListener('statechange', () => {
+                  if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                    console.log('Nova versão disponível, recarregando...');
+                    window.location.reload();
+                  }
+                });
+              });
+              
+              return registration; // Sucesso, sair do loop
+              
+            } catch (error) {
+              console.error(`Erro na tentativa ${attempt}:`, error);
+              
+              if (attempt === maxRetries) {
+                console.error('Falha ao registrar Service Worker após todas as tentativas');
+                // Não mostrar alert para não interromper a experiência do usuário
+                // Em vez disso, apenas log o erro
+                return null;
+              }
+              
+              // Aguardar antes da próxima tentativa
+              await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+            }
+          }
+        }
+        
+        // Registrar quando a página carregar ou imediatamente se já carregou
+        if (document.readyState === 'loading') {
+          window.addEventListener('load', registerServiceWorker);
+        } else {
+          registerServiceWorker();
+        }
+        
+        // Também tentar registrar quando a conexão for restaurada
+        window.addEventListener('online', () => {
+          console.log('Conexão restaurada, tentando registrar Service Worker...');
+          registerServiceWorker();
+        });
+      }
     </script>
   </body>
 </html>
