@@ -8,7 +8,7 @@ const urlsToCache = [
   '/',
   '/manifest.json',
   '/icone.svg',
-  '/icon-192.png',
+  '/icon-256.png',
   '/icon-512.png',
   '/icon-192-maskable.png',
   '/icon-512-maskable.png',
@@ -111,8 +111,8 @@ self.addEventListener('sync', (event) => {
 self.addEventListener('push', (event) => {
   const options = {
     body: event.data ? event.data.text() : 'Nova notificação do Time Manager',
-    icon: '/icon-192.png',
-    badge: '/icon-192.png',
+    icon: '/icon-256.png',
+    badge: '/icon-256.png',
     vibrate: [100, 50, 100],
     data: {
       dateOfArrival: Date.now(),
@@ -122,12 +122,12 @@ self.addEventListener('push', (event) => {
       {
         action: 'explore',
         title: 'Ver detalhes',
-        icon: '/icon-192.png'
+        icon: '/icon-256.png'
       },
       {
         action: 'close',
         title: 'Fechar',
-        icon: '/icon-192.png'
+        icon: '/icon-256.png'
       }
     ]
   };
@@ -165,8 +165,8 @@ async function syncData() {
       // Notificar usuário sobre sincronização
       self.registration.showNotification('Time Manager', {
         body: 'Dados sincronizados com sucesso!',
-        icon: '/icon-192.png',
-        badge: '/icon-192.png',
+        icon: '/icon-256.png',
+        badge: '/icon-256.png',
         tag: 'sync-success'
       });
     }

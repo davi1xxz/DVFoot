@@ -16,8 +16,8 @@
   "categories": ["sports", "productivity", "business"],
   "icons": [
     {
-      "src": "icon-192.png",
-      "sizes": "192x192",
+      "src": "icon-256.png",
+      "sizes": "256x256",
       "type": "image/png",
       "purpose": "any maskable"
     },
@@ -61,7 +61,7 @@
   "background_sync": [
     {
       "tag": "sync-data",
-      "icons": [{ "src": "icon-192.png", "sizes": "192x192", "type": "image/png" }]
+      "icons": [{ "src": "icon-256.png", "sizes": "256x256", "type": "image/png" }]
     }
   ],
   "protocol_handlers": [
@@ -100,7 +100,7 @@
         "label": "Dashboard Widget"
       }],
       "icons": [{
-        "src": "icon-192.png",
+        "src": "icon-256.png",
         "sizes": "192x192"
       }],
       "auth": false,
