@@ -28,26 +28,19 @@ const dynamicUrls = [
 self.addEventListener('install', (event) => {
   console.log('Service Worker: Instalando...');
   event.waitUntil(
-    Promise.race([
-      // Promise principal com timeout
-      caches.open(CACHE_NAME)
-        .then((cache) => {
-          console.log('Service Worker: Cache aberto, adicionando URLs...');
-          return cache.addAll(urlsToCache.filter(url => url !== '/offline.html')); // Remover URLs problemáticas
-        })
-        .then(() => {
-          console.log('Service Worker: URLs adicionadas ao cache');
-          return self.skipWaiting();
-        }),
-      // Timeout de 15 segundos
-      new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Timeout na instalação do Service Worker')), 15000);
+    caches.open(CACHE_NAME)
+      .then((cache) => {
+        console.log('Service Worker: Adicionando URLs essenciais ao cache...');
+        // Adicionar a página offline é crucial para o fallback
+        return cache.addAll(urlsToCache);
       })
-    ]).catch(error => {
-      console.error('Service Worker: Erro na instalação:', error);
-      // Continuar mesmo com erro para não bloquear
-      return self.skipWaiting();
-    })
+      .then(() => {
+        console.log('Service Worker: Cacheado com sucesso, pulando espera.');
+        return self.skipWaiting();
+      })
+      .catch(error => {
+        console.error('Service Worker: Falha ao cachear URLs essenciais:', error);
+      })
   );
 });
 
@@ -91,6 +84,15 @@ self.addEventListener('fetch', (event) => {
 // Background Sync
 self.addEventListener('sync', (event) => {
   if (event.tag === 'sync-data') {
+    console.log('Service Worker: Executando Background Sync para sync-data.');
+    event.waitUntil(syncData());
+  }
+});
+
+// Periodic Background Sync
+self.addEventListener('periodicsync', (event) => {
+  if (event.tag === 'background-sync') {
+    console.log('Service Worker: Executando Periodic Sync para background-sync.');
     event.waitUntil(syncData());
   }
 });
